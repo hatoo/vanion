@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use clap::Parser;
 use curve25519_dalek::Scalar;
 use rand::prelude::*;
@@ -8,6 +10,8 @@ use sha3::{Digest, Sha3_256};
 #[derive(Parser)]
 struct Opt {
     starts_with: String,
+    #[clap(long, short, default_value = "hs_ed25519_secret_key")]
+    out: PathBuf,
 }
 
 fn main() {
@@ -25,7 +29,7 @@ fn main() {
             let mut seed = [0u8; 32];
 
             for _ in 0..NUM_ITER {
-                // Currently using strict way to generate secret key
+                // Currently using a strict way to generate secret key
                 rng.fill_bytes(&mut seed);
                 let secret = Sha512::new().chain_update(&seed).finalize();
                 let public_key = gen_public_key(secret[..32].try_into().unwrap());
@@ -39,7 +43,7 @@ fn main() {
             let mut contents = Vec::new();
             contents.extend_from_slice(b"== ed25519v1-secret: type0 ==\x00\x00\x00");
             contents.extend_from_slice(&secret);
-            std::fs::write("secret", contents).unwrap();
+            std::fs::write(&opt.out, contents).unwrap();
             println!("{}", url_from_public_key(&public_key));
             break;
         } else {
