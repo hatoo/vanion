@@ -12,12 +12,8 @@ struct Opt {
 fn main() {
     let opt = Opt::parse();
 
-    let len = opt.starts_with.len();
-
-    let b = len * 5 / 8;
-    let q = (len * 5) % 8;
     let starts_with = base32_mask(&opt.starts_with);
-    dbg!(&starts_with);
+    let matcher = BitMatcher::new(starts_with, 5 * opt.starts_with.len());
 
     let mut rng = SmallRng::from_entropy();
 
@@ -25,7 +21,7 @@ fn main() {
         let seed: [u8; 32] = rng.gen();
         let secret = Sha512::new().chain_update(&seed).finalize();
         let public_key = gen_public_key(secret[..32].try_into().unwrap());
-        if is_match(&public_key, &starts_with, b, q) {
+        if matcher.is_match(&public_key) {
             let mut contents = Vec::new();
             contents.extend_from_slice(b"== ed25519v1-secret: type0 ==\x00\x00\x00");
             contents.extend_from_slice(&secret);
@@ -61,16 +57,31 @@ fn base32_mask(encoded: &str) -> Vec<u8> {
     mask
 }
 
-fn is_match(public_key: &[u8; 32], starts_with: &[u8], b: usize, q: usize) -> bool {
-    if public_key[..b] != starts_with[..b] {
-        return false;
+struct BitMatcher {
+    starts_with: Vec<u8>,
+    len_bits: usize,
+}
+
+impl BitMatcher {
+    fn new(starts_with: Vec<u8>, len_bits: usize) -> Self {
+        Self {
+            starts_with,
+            len_bits,
+        }
     }
 
-    if q == 0 {
-        true
-    } else {
-        let mask = 255 << (8 - q);
-        public_key[b] & mask == starts_with[b] & mask
+    #[inline(always)]
+    fn is_match(&self, public_key: &[u8; 32]) -> bool {
+        if public_key[..self.len_bits / 8] != self.starts_with[..self.len_bits / 8] {
+            return false;
+        }
+
+        if self.len_bits % 8 == 0 {
+            true
+        } else {
+            let mask = 255 << (8 - (self.len_bits % 8));
+            public_key[self.len_bits / 8] & mask == self.starts_with[self.len_bits / 8] & mask
+        }
     }
 }
 
