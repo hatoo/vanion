@@ -44,7 +44,8 @@ fn main() {
             contents.extend_from_slice(b"== ed25519v1-secret: type0 ==\x00\x00\x00");
             contents.extend_from_slice(&secret);
             std::fs::write(&opt.out, contents).unwrap();
-            println!("{}", url_from_public_key(&public_key));
+            println!("found: {}", url_from_public_key(&public_key));
+            println!("secret key have saved to {}", opt.out.display());
             break;
         } else {
             let num_tried = i * NUM_ITER * num_threads;
@@ -129,5 +130,5 @@ fn url_from_public_key(public_key: &[u8; 32]) -> String {
     let mut data = public_key.to_vec();
     data.extend_from_slice(&sum[..2]);
     data.extend_from_slice(b"\x03");
-    data_encoding::BASE32.encode(&data) + ".onion"
+    data_encoding::BASE32.encode(&data).to_lowercase() + ".onion"
 }
