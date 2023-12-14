@@ -1,6 +1,7 @@
 use clap::Parser;
 use curve25519_dalek::Scalar;
 use rand::prelude::*;
+use rayon::prelude::*;
 use sha2::Sha512;
 use sha3::{Digest, Sha3_256};
 
@@ -15,19 +16,41 @@ fn main() {
     let starts_with = base32_mask(&opt.starts_with);
     let matcher = BitMatcher::new(starts_with, 5 * opt.starts_with.len());
 
-    let mut rng = SmallRng::from_entropy();
+    let now = std::time::Instant::now();
+    for i in 1.. {
+        const NUM_ITER: usize = 100_000;
+        let num_threads = std::thread::available_parallelism().unwrap().get();
+        if let Some(secret) = (0..num_threads).into_par_iter().find_map_any(|_| {
+            let mut rng = SmallRng::from_entropy();
+            let mut seed = [0u8; 32];
 
-    loop {
-        let seed: [u8; 32] = rng.gen();
-        let secret = Sha512::new().chain_update(&seed).finalize();
-        let public_key = gen_public_key(secret[..32].try_into().unwrap());
-        if matcher.is_match(&public_key) {
+            for _ in 0..NUM_ITER {
+                // Currently using strict way to generate secret key
+                rng.fill_bytes(&mut seed);
+                let secret = Sha512::new().chain_update(&seed).finalize();
+                let public_key = gen_public_key(secret[..32].try_into().unwrap());
+                if matcher.is_match(&public_key) {
+                    return Some(secret);
+                }
+            }
+            None
+        }) {
+            let public_key = gen_public_key(secret[..32].try_into().unwrap());
             let mut contents = Vec::new();
             contents.extend_from_slice(b"== ed25519v1-secret: type0 ==\x00\x00\x00");
             contents.extend_from_slice(&secret);
             std::fs::write("secret", contents).unwrap();
             println!("{}", url_from_public_key(&public_key));
             break;
+        } else {
+            let num_tried = i * NUM_ITER * num_threads;
+
+            println!(
+                "Tried {} keys in {} seconds. {} bits",
+                num_tried,
+                now.elapsed().as_secs_f32(),
+                (num_tried as f32).log2()
+            );
         }
     }
 }
