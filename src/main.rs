@@ -51,9 +51,10 @@ fn main() {
             let num_tried = i * NUM_ITER * num_threads;
 
             println!(
-                "Tried {} keys in {} seconds. {} bits",
+                "Tried {} keys in {} seconds. {} keys/sec. Overall {} bits.",
                 num_tried,
                 now.elapsed().as_secs_f32(),
+                num_tried as f32 / now.elapsed().as_secs_f32(),
                 (num_tried as f32).log2()
             );
         }
@@ -113,6 +114,7 @@ impl BitMatcher {
     }
 }
 
+#[inline(always)]
 fn gen_public_key(secret_key: [u8; 32]) -> [u8; 32] {
     let signing_key = Scalar::from_bytes_mod_order(secret_key);
     let public_key = curve25519_dalek::constants::ED25519_BASEPOINT_TABLE * &signing_key;
