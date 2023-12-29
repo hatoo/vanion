@@ -114,7 +114,6 @@ impl BitMatcher {
     }
 }
 
-#[inline(always)]
 fn gen_public_key(secret_key: [u8; 32]) -> [u8; 32] {
     let signing_key = Scalar::from_bytes_mod_order(secret_key);
     let public_key = curve25519_dalek::constants::ED25519_BASEPOINT_TABLE * &signing_key;
